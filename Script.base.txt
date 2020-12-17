@@ -1,0 +1,113 @@
+#ajuste do modelo asterix
+### Ajuste do modelo Gompertz com e sem Ar_1 ###
+#install.packages('car')
+library(nlme)   ## Precisa caso queira usar a gnls
+library(car)    ## Precisa para o teste de Durbin-Watson
+library(lmtest) ## Precisa para o teste de Breush-Pagan
+library(qpcR)   ## Precisa para calcular o R2_ajustado direto
+
+
+###  dados  ###
+dados <- read.table("C:\\Users\\Felipe\\Desktop\\dados.csv",sep=";",h=T)
+dados
+plot(dados$tempo,dados$massa)
+
+
+#a*exp(-exp(k*(b-tempo))) outra parametrização
+#attach(dados)
+
+options(scipen = 99)
+#####MODELO GOMPERTZ######
+gomp1=nls(massa~A*exp(-B*(exp(-k*tempo))),start=c(A=400,B=100,k=0.09), data=dados)
+summary(gomp1)
+
+###  Análise de resíduos   ###
+# NORMALIDADE
+shapiro.test(residuals(gomp1))
+# O resíduo possui distribuição normal
+
+# INDEPENDÊNCIA
+MG1=attr(gomp1$m$fitted(),"gradient")
+mlg1=lm(massa~-1+MG1, data=dados)
+durbinWatsonTest(mlg1)   
+# O resíduos são independentes 
+
+# HOMOCEDASTICIDADE
+bptest(mlg1)     
+
+###  Qualidade de ajuste  ###
+coef(gomp1)     ## Parâmetros estimados
+confint(gomp1)  ## Intervalos de confiança para os parâmetros
+Rsq.ad(gomp1)   ## Coeficiente de determinação ajustado
+AIC(gomp1)      ## Critério de informação de akaike (Comparar modelos)
+
+#####MODELO BERTALANFFY#####
+
+ber1 <- nls(massa~a*(1-exp(k*(b-tempo)))^3, start=c(a=400,k=0.08,b=65),data=dados)
+summary(ber1)
+require(nlme)
+ber2 <- nls(massa~a*(1-exp(k*(b-tempo))/3)^3, start=c(a=400,k=0.08,b=65),data=dados)
+summary(ber2)
+
+
+plot(tempo,massa, xlab="Dias", ylab="massa", las=1, ylim=c(0,400))
+yest = fitted(ber1)
+lines(tempo,massa)
+
+###  Análise de resíduos   ###
+
+# NORMALIDADE
+shapiro.test(residuals(ber1))
+
+# INDEPENDÊNCIA
+MG1=attr(ber1$m$fitted(),"gradient")
+mlg1=lm(massa~-1+MG1, data=dados)
+durbinWatsonTest(mlg1)   
+
+# HOMOCEDASTICIDADE
+bptest(mlg1)     
+
+###  Qualidade de ajuste  ###
+coef(vonar)     ## Parâmetros estimados
+confint(ber1)  ## Intervalos de confiança para os parâmetros
+Rsq.ad(vonar)   ## Coeficiente de determinação ajustado
+AIC(vonar)      ## Critério de informação de akaike
+
+vonar <- gnls(massa~a*(1-exp(k*(b-tempo)))^3, start=c(a=400,k=0.08,b=35),data=dados, correlation = corAR1())
+summary(vonar)
+
+pacf(resid(vonar))
+
+
+##### MODELO LOGÍSTICO ######
+
+log1=nls(massa ~ A/(1+exp(B-k*tempo)),start=c(A=380,B=10,k=0.11), data=dados)
+summary(log1)
+
+###  Análise de resíduos   ###
+
+# NORMALIDADE
+shapiro.test(residuals(log1))
+
+# INDEPENDÊNCIA
+MG1=attr(log1$m$fitted(),"gradient")
+mlg1=lm(massa~-1+MG1, data=dados)
+durbinWatsonTest(mlg1)   
+
+# HOMOCEDASTICIDADE
+bptest(mlg1)    
+
+###  Qualidade de ajuste  ###
+coef(log1)     ## Parâmetros estimados
+confint(log1)  ## Intervalos de confiança para os parâmetros
+Rsq.ad(log1)   ## Coeficiente de determinação ajustado
+AIC(log1)      ## Critério de informação de akaike
+# Quanto menor o AIC melhor é o ajuste
+#Quanto maior o R_2 ajus melhor o ajuste
+
+### graficamente
+plot(dados$tempo,dados$massa, xlab="Dias após o plantio", ylab="Produtividade de matéria fresca de tubérculo (kg ha-1)", pch=19)
+lines(dados$tempo,fitted(log1), col="blue", lty=1, lwd=2)
+lines(dados$tempo,fitted(gomp1), col="red", lty=2, lwd=2)
+lines(dados$tempo,fitted(ber1), col="black", lty=3, lwd=2)
+legend (80,140, c("Logístico","Gompertz", "Von Bertalanffy"), lty=c(1,2,3),pch=c("", "", "", "",""), col=c("blue","red","black"), cex=.70)
